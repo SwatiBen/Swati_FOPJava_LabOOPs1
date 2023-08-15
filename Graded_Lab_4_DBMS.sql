@@ -1,4 +1,4 @@
-/* 1 & 2 - Creating the tables. */
+-- 1 & 2 - Creating the tables
 
 Create Database if not exists `Ecommerse_Web` ;
 use `Ecommerse_Web`;
@@ -40,24 +40,22 @@ FOREIGN KEY (`PRO_ID`) REFERENCES product(`PRO_ID`),
 FOREIGN KEY (`SUPP_ID`) REFERENCES supplier(`SUPP_ID`)
 );
 
-CREATE TABLE IF NOT EXISTS `order` (
-`ORD_ID` INT NOT NULL,
-`ORD_AMOUNT` INT NOT NULL,
-`ORD_DATE` DATE,
-`CUS_ID` INT NOT NULL,
-`pricing_id` INT NOT NULL,
-PRIMARY KEY (`ORD_ID`),
-FOREIGN KEY (`CUS_ID`) REFERENCES customer(`CUS_ID`),
-FOREIGN KEY (`pricing_id`) REFERENCES supplier_pricing(`pricing_id`)
-);
+create table orders (
+ord_id int primary key,
+ord_date date not null,
+ord_amount int default 0,
+cus_id int,
+pricing_id int,
+foreign key (cus_id) references customer(cus_id),
+foreign key (pricing_id) references Supplier_Pricing(pricing_id));
 
 create table ratings(
 rating_id int primary key,
 rat_ratstarts int,
 ord_id int,
-foreign key (ord_id) references Orders(ord_id));;
+foreign key (ord_id) references orders(ord_id));;
 
-/* 3 Insert values in all the tables */
+--3 Insert values in all the tables
 
 INSERT INTO Supplier (supp_id, supp_name, supp_city, supp_phone) VALUES
 (1, 'Rajesh Retails', 'Delhi', '1234567890'),
@@ -152,53 +150,67 @@ INSERT INTO ratings (rating_ID, ord_id,rat_ratstarts) VALUES
 /* 4. Display the number of customers based on gender who have placed individual orders of worth at least Rs. 3000 */
 
 select customer.cus_gender, count(customer.cus_gender) as count from customer 
-inner join `order` on customer.cus_id = `order`.cus_id where `order`.ord_amount >= 3000
+inner join `orders` on customer.cus_id = `orders`.cus_id where `orders`.ord_amount >= 3000
 group by customer.cus_gender;
 
 
-/* 5. Display all the orders along with the product name ordered by a customer 
-	  having Customer_Id=2. */
+-- Display all the orderss along with the product name ordersed by a customer 
+-- 	  having Customer_Id=2.
 
-select `order`.*, product.pro_name from `order`, supplier_pricing, product where 
-`order`.cus_id = 2 and `order`.pricing_id = supplier_pricing.pricing_id and 
-supplier_pricing.pricing_id = product.pro_id;
+SELECT o.ord_id, p.pro_name
+FROM Orders o
+JOIN Customer c ON o.cus_id = c.cus_id
+JOIN Supplier_Pricing sp ON o.pricing_id = sp.pricing_id
+JOIN Product p ON sp.pro_id = p.pro_id
+WHERE c.cus_id = 2;
 
 
-/* 6. Display the Supplier details who can supply more than one product*/
+-- 6. Display the Supplier details who can supply more than one product
 
 select supplier.* from supplier, supplier_pricing where supplier.supp_id in 
 (select supplier_pricing.supp_id from supplier_pricing group by supplier_pricing.supp_id
 having count(supplier_pricing.supp_id)>1) group by supplier.supp_id;
 
 
-/* 7. Find the least expensive product */
+-- 7. Find the least expensive product
 
-select category.* from `order`, supplier_pricing, product, category
-where `order`.pricing_id = supplier_pricing.pricing_id
-and supplier_pricing.pro_id = product.pro_id
-and product.cat_id = category.cat_id
-and `order`.ord_amount = (SELECT MIN(ord_amount) FROM `order`);
-
-
-/* 8. Display the Id and Name of the Product ordered after “2021-10-05”. */
-
-select product.pro_id, product.pro_name from `order` inner join supplier_pricing 
-on supplier_pricing.pricing_id = `order`.pricing_id inner join product on 
-product.pro_id = supplier_pricing.pro_id where `order`.ord_date > "2021-10-05";
+SELECT c.cat_id, c.cat_name, p.pro_name, sp.supp_price
+FROM Category c
+JOIN Product p ON c.cat_id = p.cat_id
+JOIN Supplier_Pricing sp ON p.pro_id = sp.pro_id
+WHERE sp.supp_price = (
+    SELECT MIN(supp_price)
+    FROM Supplier_Pricing
+    WHERE pro_id = p.pro_id
+)
+ORDER BY c.cat_id;
 
 
-/* 9. Display customer name and gender whose names start or end with 
-      character 'A'. */
+-- 8. Display the Id and Name of the Product ordersed after “2021-10-05”.
+
+select product.pro_id, product.pro_name from `orders` inner join supplier_pricing 
+on supplier_pricing.pricing_id = `orders`.pricing_id inner join product on 
+product.pro_id = supplier_pricing.pro_id where `orders`.ord_date > "2021-10-05";
+
+
+--  9. Display customer name and gender whose names start or end with 
+--       character 'A'.
 
 select customer.cus_name, customer.cus_gender from customer where
 customer.cus_name like 'A%' or customer.cus_name like '%A';
 
 
-/* 10. */
+--  10. 
 
-select supplier.supp_id, supplier.supp_name, rating.rat_ratstars,
+SELECT s.supp_id, s.supp_name, r.rat_ratstarts,
 CASE
-	WHEN rating.rat_ratstars>4 THEN 'Good Service'
-    WHEN rating.rat_ratstars>2 THEN 'Average Service'
-    ELSE 'Poor Service'
-END AS verdict from rating inner join supplier on supplier.supp_id=rating.supp_id;
+	WHEN r.rat_ratstarts = 5 THEN 'Excellent Service'
+	WHEN r.rat_ratstarts > 4 THEN 'Good Service'
+	WHEN r.rat_ratstarts > 2 THEN 'Average Service'
+	ELSE 'Poor Service'
+END AS Type_of_Service
+FROM Supplier s
+JOIN Supplier_Pricing sp ON s.supp_id = sp.supp_id
+JOIN Product p ON sp.pro_id = p.pro_id
+JOIN Orders o ON sp.pricing_id = o.pricing_id
+LEFT JOIN ratings r ON o.ord_id = r.ord_id;
